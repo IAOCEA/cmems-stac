@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 mfc_id = re.compile(
     r"""
@@ -37,3 +38,43 @@ old_tac_id = re.compile(
     """,
     flags=re.VERBOSE,
 )
+
+
+@dataclass(frozen=True)
+class MFCCollectionId:
+    geographical_area: str
+    product_type: str
+    thematic: str
+    complementary_info: str | None
+    center_ranking: str
+    center_id: str
+
+    @classmethod
+    def from_string(cls, string):
+        match = mfc_id.fullmatch(string)
+        if match is None:
+            raise ValueError(f"invalid model and forecasting center ID: {string}")
+
+        return cls(**match.groupdict())
+
+
+@dataclass(frozen=True)
+class TACCollectionId:
+    observation_type: str
+    geographical_area: str
+    thematic: str | None
+    complementary_info: str | None
+    kind_product: str
+    product_type: str
+    center_ranking: str
+    center_id: str
+
+    @classmethod
+    def from_string(cls, string):
+        match = tac_id.fullmatch(string) or old_tac_id.fullmatch(string)
+        if match is None:
+            raise ValueError(f"invalid thematic assembly center ID: {string}")
+
+        parts = match.groupdict()
+        parts.setdefault("thematic", "PHY")
+        return cls(**parts)
