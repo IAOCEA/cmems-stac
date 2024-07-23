@@ -7,8 +7,8 @@ id_ = re.compile(
     (?:-(?P<pc>[a-z]+))?
     _(?P<area>[a-z]+)
     _(?P<thematic>[a-z]+)
-    (?:-(?P<var>[a-z]+))?
-    _(?P<type>[a-z]+)
+    (?:-(?P<var>[-a-z0-9]+))?
+    (?:_(?P<type>[a-z]+))
     (?:_(?P<complementary_info>[^_]+))
     _(?P<temporal_resolution>[A-Z0-9a-z.]{3,})
     (?:-(?P<typology>[im]))?
