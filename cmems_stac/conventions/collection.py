@@ -66,7 +66,7 @@ class MFCCollectionId:
 
     def to_stac(self):
         geographical_areas = {
-            "ARCTIC": "arctic",
+            "ARCTIC": "arctic sea",
             "BALTICSEA": "baltic sea",
             "BLKSEA": "black sea",
             "GLOBAL": "global",
@@ -104,10 +104,10 @@ class TACCollectionId:
 
     def to_stac(self):
         geographical_areas = {
-            "ATL": "european atlantic sea",
+            "ATL": "european atlantic sea",  # IBI + NWS
             "ARC": "arctic sea",
             "BAL": "baltic sea",
-            "EUR": "european seas",
+            "EUR": "european seas",  # MED + IBI + NWS + BAL + BLK
             "GLO": "global",
             "IBI": "iberia biscay ireland",
             "MED": "mediterranean sea",
