@@ -104,7 +104,7 @@ class TACCollectionId:
 
     def to_stac(self):
         geographical_areas = {
-            "ATL": "european atlantic sea",  # IBI + NWS
+            "ATL": "european atlantic ocean",  # IBI + NWS
             "ARC": "arctic sea",
             "BAL": "baltic sea",
             "EUR": "european seas",  # MED + IBI + NWS + BAL + BLK
