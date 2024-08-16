@@ -160,4 +160,4 @@ def parse_collection_id(string):
         except ValueError:
             pass
 
-    raise ValueError(f"unknown collection id format: {string}")
+    raise ParserError(f"unknown collection id format: {string}")
