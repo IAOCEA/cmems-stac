@@ -1,6 +1,11 @@
 import re
 from dataclasses import dataclass
 
+
+class ParserError(ValueError):
+    pass
+
+
 mfc_id = re.compile(
     r"""
     (?P<geographical_area>[A-Z]+)
@@ -60,7 +65,7 @@ class MFCCollectionId:
     def from_string(cls, string):
         match = mfc_id.fullmatch(string)
         if match is None:
-            raise ValueError(f"invalid model and forecasting center ID: {string}")
+            raise ParserError(f"invalid model and forecasting center ID: {string}")
 
         return cls(**match.groupdict())
 
@@ -96,7 +101,7 @@ class TACCollectionId:
     def from_string(cls, string):
         match = tac_id.fullmatch(string) or old_tac_id.fullmatch(string)
         if match is None:
-            raise ValueError(f"invalid thematic assembly center ID: {string}")
+            raise ParserError(f"invalid thematic assembly center ID: {string}")
 
         parts = match.groupdict()
         parts.setdefault("thematic", "PHY")
