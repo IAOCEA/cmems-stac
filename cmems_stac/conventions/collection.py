@@ -6,6 +6,10 @@ class ParserError(ValueError):
     pass
 
 
+class FormatError(ValueError):
+    pass
+
+
 mfc_id = re.compile(
     r"""
     (?P<geographical_area>[A-Z]+)
@@ -79,11 +83,14 @@ class MFCCollectionId:
             "MEDSEA": "mediterranean sea",
             "NWSHELF": "northwest shelf",
         }
-        return {
-            "cmems:geographical_area": geographical_areas[self.geographical_area],
-            "cmems:thematic": thematics[self.thematic],
-            "cmems:product_type": self.product_type.lower(),
-        }
+        try:
+            return {
+                "cmems:geographical_area": geographical_areas[self.geographical_area],
+                "cmems:thematic": thematics[self.thematic],
+                "cmems:product_type": self.product_type.lower(),
+            }
+        except KeyError as e:
+            raise FormatError("could not format collection id {self}") from e
 
 
 @dataclass(frozen=True)
@@ -135,12 +142,15 @@ class TACCollectionId:
             "STATIC": "static",
         }
 
-        return {
-            "cmems:geographical_area": geographical_areas[self.geographical_area],
-            "cmems:thematic": thematics[self.thematic],
-            "cmems:observation_type": observation_types[self.observation_type],
-            "cmems:product_type": product_types[self.product_type],
-        }
+        try:
+            return {
+                "cmems:geographical_area": geographical_areas[self.geographical_area],
+                "cmems:thematic": thematics[self.thematic],
+                "cmems:observation_type": observation_types[self.observation_type],
+                "cmems:product_type": product_types[self.product_type],
+            }
+        except KeyError as e:
+            raise FormatError(f"could not format collection id {self}") from e
 
 
 def parse_collection_id(string):
