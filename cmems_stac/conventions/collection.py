@@ -12,7 +12,7 @@ class FormatError(ValueError):
 
 mfc_id = re.compile(
     r"""
-    (?P<geographical_area>[A-Z]+)
+    (?P<geographic_area>[A-Z]+)
     _(?P<product_type>[A-Z]+)
     _(?P<thematic>[A-Z]+)
     (?:_(?P<complementary_info>[A-Z]+))?
@@ -24,7 +24,7 @@ mfc_id = re.compile(
 tac_id = re.compile(
     r"""
     (?P<observation_type>[A-Z]+)
-    _(?P<geographical_area>[A-Z]+)
+    _(?P<geographic_area>[A-Z]+)
     _(?P<thematic>[A-Z]+)
     (?:_(?P<complementary_info>[A-Z]+))??
     _(?P<kind_product>[A-Z0-9]+)
@@ -37,13 +37,36 @@ tac_id = re.compile(
 old_tac_id = re.compile(
     r"""
     (?P<observation_type>[A-Z]+)
-    _(?P<geographical_area>[A-Z]+)
+    _(?P<geographic_area>[A-Z]+)
     _(?P=observation_type)
     _(?P<kind_product>[A-Z0-9]+)
     _(?P<product_type>[A-Z]+)
     _(?P<complementary_info>[A-Z]+)
     _(?P<center_ranking>[0-9]{3})
     _(?P<center_id>[0-9]{3})
+    """,
+    flags=re.VERBOSE,
+)
+omi_id = re.compile(
+    r"""
+    (?P<product_type>OMI)
+    _(?P<omi_family>CLIMATE|HEALTH|CIRCULATION|VAR_EXTREME|EXTREME)
+    _(?P<omi_subfamily>[a-zA-Z]+)
+    _(?P<geographic_area>[A-Z]+)
+    (?:_(?P<observation_type>[A-Z]+))?
+    _(?P<indicator_type>[a-z_]+)
+    """,
+    flags=re.VERBOSE,
+)
+old_omi_id = re.compile(
+    r"""
+    (?P<geographic_area>[A-Z]+)
+    _(?P<product_type>OMI)
+    (?:_(?P<omi_subfamily>CLIMVAR|HEALTH|CURRENTS|OHC|TEMPSAL|SI|SL|WMHE|SEASTATE|NATLANTIC|CURRENTS))?
+    (?:_(?P<omi_family>extreme_var))?
+    (?:_(?P<observation_type>[A-Z]+))?
+    _(?P<indicator_type>[a-zA-Z0-9_]+?)
+    (?:_[0-9]{1,3}_[0-9]{3,})?
     """,
     flags=re.VERBOSE,
 )
@@ -58,7 +81,7 @@ thematics = {
 
 @dataclass(frozen=True)
 class MFCCollectionId:
-    geographical_area: str
+    geographic_area: str
     product_type: str
     thematic: str
     complementary_info: str | None
@@ -74,7 +97,7 @@ class MFCCollectionId:
         return cls(**match.groupdict())
 
     def to_stac(self):
-        geographical_areas = {
+        geographic_areas = {
             "ARCTIC": "arctic sea",
             "BALTICSEA": "baltic sea",
             "BLKSEA": "black sea",
@@ -85,18 +108,18 @@ class MFCCollectionId:
         }
         try:
             return {
-                "cmems:geographical_area": geographical_areas[self.geographical_area],
+                "cmems:geographic_area": geographic_areas[self.geographic_area],
                 "cmems:thematic": thematics[self.thematic],
                 "cmems:product_type": self.product_type.lower(),
             }
         except KeyError as e:
-            raise FormatError("could not format collection id {self}") from e
+            raise FormatError(f"could not format collection id {self}") from e
 
 
 @dataclass(frozen=True)
 class TACCollectionId:
     observation_type: str
-    geographical_area: str
+    geographic_area: str
     thematic: str | None
     complementary_info: str | None
     kind_product: str
@@ -115,7 +138,7 @@ class TACCollectionId:
         return cls(**parts)
 
     def to_stac(self):
-        geographical_areas = {
+        geographic_areas = {
             "ATL": "european atlantic ocean",  # IBI + NWS
             "ARC": "arctic sea",
             "BAL": "baltic sea",
@@ -144,7 +167,7 @@ class TACCollectionId:
 
         try:
             return {
-                "cmems:geographical_area": geographical_areas[self.geographical_area],
+                "cmems:geographic_area": geographic_areas[self.geographic_area],
                 "cmems:thematic": thematics[self.thematic],
                 "cmems:observation_type": observation_types[self.observation_type],
                 "cmems:product_type": product_types[self.product_type],
@@ -153,8 +176,128 @@ class TACCollectionId:
             raise FormatError(f"could not format collection id {self}") from e
 
 
+@dataclass
+class OMICollectionId:
+    product_type: str
+    omi_family: str
+    omi_subfamily: str
+    geographic_area: str
+    observation_type: str | None
+    indicator_type: str
+
+    @classmethod
+    def from_string(cls, string):
+        match = omi_id.fullmatch(string)
+        if match is not None:
+            return cls(**match.groupdict())
+
+        match = old_omi_id.fullmatch(string)
+        if match is None:
+            raise ParserError(f"invalid ocean monitoring indicator ID: {string}")
+
+        parts = match.groupdict()
+        subfamilies = {
+            "OHC": "CLIMATE",
+            "TEMPSAL": "CLIMATE",
+            "CLIMVAR": "VAR_EXTREME",
+            "SI": "CLIMATE",
+            "SL": "CLIMATE",
+            "SEASTATE": "VAR_EXTREME",
+            "HEALTH": "HEALTH",
+            "NATLANTIC": "CIRCULATION",
+            "CURRENTS": "CIRCULATION",
+            "WMHE": "CIRCULATION",
+        }
+        # look up omi_family from the subfamily
+        parts["omi_family"] = subfamilies.get(parts["omi_subfamily"])
+        if parts["omi_family"] is None:
+            raise ParserError(
+                f"invalid ocean monitoring indicator ID (unknown family): {string}"
+            )
+
+        return cls(**parts)
+
+    def to_stac(self):
+        families = {
+            "CLIMATE": "climate",
+            "HEALTH": "health",
+            "CIRCULATION": "circulation",
+            "VAR_EXTREME": "variability and extremes",
+            "EXTREME": "extremes",
+        }
+        subfamilies = {
+            # climate
+            "sst": "sea surface temperature",
+            "ohc": "ocean heat content",
+            "ocu": "ocean carbon uptake",
+            "si": "sea ice change",
+            "sl": "sea level mean",
+            "ofc": "ocean freshwater",
+            # health
+            "chl": "chlorophyll production",
+            "pp": "primary production",
+            "ph": "acidification",
+            "oxygen": "deoxygenation",
+            "eutroph": "eutrophication",
+            "bloom": "blooms",
+            "oligo": "oligotrophication",
+            "coral": "coral health",
+            # circulation
+            "heattrans": "heat transport",
+            "voltranss": "volume transport",
+            "moc": "meridional overturning circulation",
+            "gyre": "gyres",
+            "upwell": "upwelling",
+            "boundary": "boundary currents",
+            "windcirc": "wind driven circulation",
+            # variability and extremes
+            "hmw": "marine heat waves",
+            "coldspell": "cold spells",
+            "climvar": "climate variability",
+            "state": "sea state",
+            "extremesl": "extreme sea level",
+            "storm": "storm potential",
+            "cyclone": "cyclone potential",
+        }
+        geographic_areas = {
+            "ATLANTIC": "atlantic",
+            "ARCTIC": "arctic sea",
+            "BALTIC": "baltic sea",
+            "BLKSEA": "black sea",
+            "EUROPE": "europe",
+            "GLOBAL": "global",
+            "IBI": "iberia biscay ireland",
+            "MEDSEA": "mediterranean sea",
+            "NORTHWESTSHELF": "northwest shelf",
+            "INDIAN": "indian ocean",
+            "PACIFIC": "pacific",
+            "SOUTHERN": "southern hemisphere",
+            "NORTHERN": "northern hemisphere",
+        }
+        indicator_types = {
+            "area_averaged_anomalies": "area averaged anomalies",
+            "trend": "trend",
+            "area_averaged_mean": "area averaged mean",
+            "enso_nino": "el nino southern oscillation",
+            "pdo": "pacific decadal oscillation",
+            "mei": "multivariate enso index",
+        }
+
+        try:
+            return {
+                "cmems:omi_family": families[self.omi_family],
+                "cmems:omi_family_abbrev": self.omi_family,
+                "cmems:omi_subfamily": subfamilies[self.omi_subfamily],
+                "cmems:omi_subfamily_abbrev": self.omi_subfamily,
+                "cmems:geographic_area": geographic_areas[self.geographic_area],
+                "cmems:indicator_type": indicator_types[self.indicator_type],
+            }
+        except KeyError as e:
+            raise FormatError(f"could not format collection id {self}") from e
+
+
 def parse_collection_id(string):
-    for cls in [MFCCollectionId, TACCollectionId]:
+    for cls in [MFCCollectionId, TACCollectionId, OMICollectionId]:
         try:
             return cls.from_string(string)
         except ParserError:
